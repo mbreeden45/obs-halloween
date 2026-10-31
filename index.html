@@ -2,22 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Halloween Watch Party Overlay</title>
+<title>Haunted Trojans Overlay</title>
 <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
 <!--
-  Halloween football watch-party overlay for OBS Browser Source.
-  - Set the Browser Source to 1920x1080 and point it at this file (Local file) or localhost.
-  - No external dependencies. Background is fully transparent.
+  Halloween football watch-party overlay for OBS Browser Source (1920x1080, transparent).
+  USC cardinal & gold theme. No external files or libraries.
 
-  Optional URL parameters (e.g. index.html?debug=1&batMin=5):
-    debug=1             Preview mode: fake turf background + outlines of the protected broadcast zones.
-                        Keys: L = lightning, B = bat swoop.
-    fog=0 | bats=0 | webs=0 | lightning=0 | spider=0   Disable an individual effect.
-    fogDensity=1        Fog opacity multiplier (e.g. 0.6 lighter, 1.4 heavier).
-    batMin=9 batMax=22  Seconds between bat swoops (random in range).
-    lightningMin=30 lightningMax=60   Seconds between lightning flashes (random in range).
-    lightningStrength=1 Flash brightness multiplier.
-    fps=0               Cap the canvas frame rate (0 = match display, e.g. 30 to save CPU/GPU).
+  Ambient (always running, all kept to the screen edges so the game stays clear):
+    haunted frame glow, rolling side fog, peeking ghosts, glowing eyes in the dark,
+    pumpkin patch + tombstone (bottom-left), corner spiderwebs + spider, lightning.
+
+  Automatic score celebrations (needs internet): polls ESPN's public scoreboard feed
+  and celebrates USC touchdowns / field goals / safeties / the win, and boos Ohio State scores.
+
+  URL options, e.g. index.html?delay=40&debug=1
+    delay=30          Seconds to wait after ESPN reports a score before celebrating,
+                      so it lines up with your TV/stream delay (and never spoils a score).
+    scores=0          Turn off the automatic score celebrations.
+    team=30           ESPN team id to cheer for (30 = USC).
+    event=401858509   Force a specific ESPN game id (normally found automatically).
+    debug=1           Preview on a fake field with protected zones outlined + score status.
+                      Keys: T touchdown, F field goal, S safety, O opponent score, W win,
+                            L lightning, G ghost.
+    fog=0 ghosts=0 eyes=0 webs=0 pumpkins=0 lightning=0 frame=0   Turn off an effect.
+    fogDensity=1      Fog opacity multiplier.
+    lightningMin=40 lightningMax=90   Seconds between ambient lightning strikes.
+    fps=0             Frame-rate cap (e.g. 30 to save CPU/GPU; 0 = match display).
 -->
 <style>
   html, body {
@@ -51,41 +61,68 @@
     background: transparent;
   }
 
-  /* ---------- Corner spiderwebs ---------- */
-  .web {
-    position: absolute;
-    top: 0;
-    width: 290px;
-    height: 290px;
-    opacity: 0.8;
+  #frame { animation: frame-breathe 9s ease-in-out infinite; }
+  @keyframes frame-breathe {
+    0%, 100% { opacity: 0.9; }
+    50%      { opacity: 1; }
   }
+
+  /* ---------- Corner spiderwebs ---------- */
+  .web { position: absolute; top: 0; opacity: 0.85; }
   .web.left  { left: 0; }
-  .web.right { right: 0; transform: scaleX(-1); }   /* mirror into the top-right corner */
+  .web.right { right: 0; transform: scaleX(-1); }
   .web svg {
     display: block;
-    overflow: hidden;
     transform-origin: 0 0;
     animation: web-sway 11s ease-in-out infinite;
   }
   .web.right svg { animation-duration: 13s; animation-delay: -4s; }
-
   @keyframes web-sway {
     0%, 100% { transform: rotate(0deg) scale(1); }
     50%      { transform: rotate(0.6deg) scale(1.008); }
   }
-
   .dew { animation: dew-glint 6s ease-in-out infinite; }
   @keyframes dew-glint {
     0%, 100% { opacity: 0.25; }
-    50%      { opacity: 0.85; }
+    50%      { opacity: 0.9; }
   }
-
   .spider { animation: spider-bob 14s ease-in-out infinite; }
   @keyframes spider-bob {
     0%, 100% { transform: translateY(0); }
     30%      { transform: translateY(-6px); }
-    55%      { transform: translateY(34px); }
-    70%      { transform: translateY(30px); }
+    55%      { transform: translateY(40px); }
+    70%      { transform: translateY(36px); }
+  }
+
+  /* ---------- Pumpkin patch ---------- */
+  #patch {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 470px;
+    height: 230px;
+  }
+  #patch svg { display: block; overflow: visible; }
+  .flicker-a { animation: flicker 3.1s infinite; }
+  .flicker-b { animation: flicker 2.3s infinite reverse; }
+  .flicker-c { animation: flicker 4.7s infinite; }
+  @keyframes flicker {
+    0%   { opacity: 0.92; }
+    7%   { opacity: 0.75; }
+    11%  { opacity: 1; }
+    23%  { opacity: 0.85; }
+    31%  { opacity: 0.98; }
+    46%  { opacity: 0.7; }
+    52%  { opacity: 0.95; }
+    68%  { opacity: 0.82; }
+    74%  { opacity: 1; }
+    88%  { opacity: 0.78; }
+    100% { opacity: 0.92; }
+  }
+  #patch.cheer .glow { animation: cheer-glow 0.35s ease-in-out 12 alternate; }
+  @keyframes cheer-glow {
+    from { opacity: 0.8; }
+    to   { opacity: 1; filter: brightness(1.5); }
   }
 
   /* ---------- Lightning flash ---------- */
@@ -96,24 +133,72 @@
     width: 1920px;
     height: 1080px;
     opacity: 0;
-    pointer-events: none;
   }
-  #flash.strike { animation: strike 0.8s ease-out 1 both; }
+  #flash.strike { animation: strike 0.9s ease-out 1 both; }
   @keyframes strike {
     0%   { opacity: 0; }
-    6%   { opacity: 1; }
-    16%  { opacity: 0.12; }
-    26%  { opacity: 0.75; }
-    46%  { opacity: 0.05; }
-    56%  { opacity: 0.3; }
+    5%   { opacity: 1; }
+    14%  { opacity: 0.15; }
+    24%  { opacity: 0.85; }
+    44%  { opacity: 0.08; }
+    54%  { opacity: 0.4; }
     100% { opacity: 0; }
+  }
+
+  /* ---------- Celebration banner ---------- */
+  #banner {
+    position: absolute;
+    left: 0;
+    width: 1920px;
+    top: 250px;
+    text-align: center;
+    opacity: 0;
+    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif;
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  #banner .big {
+    display: block;
+    font-size: 170px;
+    color: #ffc72c;
+    -webkit-text-stroke: 4px #6e0f1f;
+    text-shadow:
+      0 0 18px rgba(255, 199, 44, 0.75),
+      0 0 60px rgba(157, 34, 53, 0.9),
+      0 6px 0 #4a0713,
+      0 10px 24px rgba(0, 0, 0, 0.8);
+  }
+  #banner .small {
+    display: block;
+    margin-top: 18px;
+    font-size: 68px;
+    color: #fff3d0;
+    -webkit-text-stroke: 2px #6e0f1f;
+    text-shadow: 0 0 22px rgba(157, 34, 53, 1), 0 4px 14px rgba(0, 0, 0, 0.85);
+  }
+  #banner.boo .big {
+    color: rgba(235, 240, 255, 0.85);
+    -webkit-text-stroke: 2px rgba(60, 70, 100, 0.8);
+    text-shadow: 0 0 30px rgba(190, 210, 255, 0.8), 0 0 80px rgba(120, 140, 200, 0.6);
+    font-size: 150px;
+  }
+  #banner.boo .small { color: rgba(220, 225, 240, 0.85); text-shadow: 0 0 20px rgba(120,140,200,0.8); }
+  #banner.show { animation: banner-in-out var(--dur, 6s) ease-out 1 both; }
+  @keyframes banner-in-out {
+    0%   { opacity: 0; transform: scale(0.55) rotate(-3deg); filter: blur(14px); }
+    8%   { opacity: 1; transform: scale(1.08) rotate(1deg);  filter: blur(0); }
+    12%  { transform: scale(0.97) rotate(-1deg); }
+    16%  { transform: scale(1.02) rotate(0.5deg); }
+    20%  { transform: scale(1) rotate(0); }
+    78%  { opacity: 1; transform: scale(1.03); filter: blur(0); }
+    100% { opacity: 0; transform: scale(1.12) translateY(-40px); filter: blur(18px); }
   }
 
   /* ---------- Debug / preview mode only ---------- */
   body.debug {
     background:
       repeating-linear-gradient(90deg, transparent 0 158px, rgba(255,255,255,0.18) 158px 162px),
-      linear-gradient(180deg, #1f4a22 0%, #2f6a2f 55%, #26592a 100%);
+      linear-gradient(180deg, #2f6a33 0%, #3f8a40 55%, #357a37 100%);
   }
   .zone {
     position: absolute;
@@ -124,24 +209,28 @@
     font: 600 18px/1.3 system-ui, sans-serif;
     padding: 8px 12px;
   }
-  .debug-help {
+  #debugStatus {
     position: absolute;
     left: 50%;
-    top: 46%;
-    transform: translate(-50%, -50%);
-    color: rgba(255,255,255,0.85);
+    top: 640px;
+    transform: translateX(-50%);
+    color: #fff;
     font: 500 22px/1.5 system-ui, sans-serif;
     text-align: center;
     text-shadow: 0 1px 3px #000;
+    white-space: pre;
   }
 </style>
 </head>
 <body>
 <div id="stage">
+  <canvas id="frame" width="1920" height="1080"></canvas>
   <canvas id="fx" width="1920" height="1080"></canvas>
   <div class="web left"  id="webLeft"></div>
   <div class="web right" id="webRight"></div>
+  <div id="patch"></div>
   <div id="flash"></div>
+  <div id="banner"><span class="big"></span><span class="small"></span></div>
 </div>
 
 <script>
@@ -149,10 +238,12 @@
   'use strict';
 
   const W = 1920, H = 1080;
+  const CARDINAL = '157,34,53';
+  const GOLD = '255,199,44';
 
-  /* ------------------------------------------------------------------ *
-   * Configuration (overridable with URL params, see header comment)
-   * ------------------------------------------------------------------ */
+  /* ================================================================== *
+   * Configuration
+   * ================================================================== */
   const params = new URLSearchParams(window.location.search);
   const num = (k, d) => { const v = parseFloat(params.get(k)); return Number.isFinite(v) ? v : d; };
   const flag = (k, d) => {
@@ -162,39 +253,45 @@
   };
 
   const CONFIG = {
-    debug:             flag('debug', false),
-    fog:               flag('fog', true),
-    bats:              flag('bats', true),
-    webs:              flag('webs', true),
-    spider:            flag('spider', true),
-    lightning:         flag('lightning', true),
-    fogDensity:        Math.max(0, num('fogDensity', 1)),
-    fogPuffs:          60,
-    batMin:            Math.max(1, num('batMin', 9)),
-    batMax:            Math.max(1, num('batMax', 22)),
-    lightningMin:      Math.max(2, num('lightningMin', 30)),
-    lightningMax:      Math.max(2, num('lightningMax', 60)),
-    lightningStrength: Math.max(0, num('lightningStrength', 1)),
-    fps:               Math.max(0, num('fps', 0)),
+    debug:        flag('debug', false),
+    frame:        flag('frame', true),
+    fog:          flag('fog', true),
+    ghosts:       flag('ghosts', true),
+    eyes:         flag('eyes', true),
+    webs:         flag('webs', true),
+    pumpkins:     flag('pumpkins', true),
+    lightning:    flag('lightning', true),
+    fogDensity:   Math.max(0, num('fogDensity', 1)),
+    lightningMin: Math.max(5, num('lightningMin', 40)),
+    lightningMax: Math.max(5, num('lightningMax', 90)),
+    ghostMin:     35,
+    ghostMax:     70,
+    fps:          Math.max(0, num('fps', 0)),
 
-    // Fog is only drawn in the bottom third, then knocked out of these zones
-    // so the broadcast score bug / down & distance / game clock stay readable.
-    // strength = fraction of fog removed inside the zone (soft feathered edges).
+    scores:       flag('scores', true),
+    team:         params.get('team') || '30',
+    event:        params.get('event') || '',
+    delay:        Math.max(0, num('delay', 30)),
+
+    // Broadcast graphics that must stay readable. Fog is erased here and ambient
+    // effects are kept out of these areas.
     clearZones: [
-      { label: 'Score bug / down & distance', x: 500,  y: 850, w: 900, h: 230, strength: 0.9 },
-      { label: 'Game clock / network bug',    x: 1400, y: 770, w: 520, h: 310, strength: 0.92 },
+      { label: 'Score bug / down & distance', x: 500,  y: 850, w: 900, h: 230 },
+      { label: 'Game clock / network bug',    x: 1400, y: 770, w: 520, h: 310 },
+      { label: 'Top broadcast graphics',      x: 0,    y: 0,   w: W,   h: 110 },
     ],
-    // Bats fly below this line so top-of-screen broadcast graphics stay clear.
-    topClearHeight: 120,
   };
 
   const rand  = (a, b) => a + Math.random() * (b - a);
+  const pick  = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+  const easeInOut = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  const nowS = () => performance.now() / 1000;
 
-  /* ------------------------------------------------------------------ *
-   * Stage scaling (1:1 at 1920x1080, scales if the source size differs)
-   * ------------------------------------------------------------------ */
+  /* ================================================================== *
+   * Stage scaling (1:1 at 1920x1080)
+   * ================================================================== */
   const stage = document.getElementById('stage');
   function fitStage() {
     const s = Math.min(window.innerWidth / W, window.innerHeight / H) || 1;
@@ -203,239 +300,552 @@
   window.addEventListener('resize', fitStage);
   fitStage();
 
-  const canvas = document.getElementById('fx');
-  const ctx = canvas.getContext('2d');
+  const fx = document.getElementById('fx');
+  const ctx = fx.getContext('2d');
 
-  /* ------------------------------------------------------------------ *
-   * FOG / MIST
-   * ------------------------------------------------------------------ */
-  function makePuffSprite(r, g, b) {
-    const c = document.createElement('canvas');
-    c.width = c.height = 256;
-    const x = c.getContext('2d');
-    const gr = x.createRadialGradient(128, 128, 0, 128, 128, 128);
-    gr.addColorStop(0.00, `rgba(${r},${g},${b},1)`);
-    gr.addColorStop(0.35, `rgba(${r},${g},${b},0.6)`);
-    gr.addColorStop(0.70, `rgba(${r},${g},${b},0.18)`);
-    gr.addColorStop(1.00, `rgba(${r},${g},${b},0)`);
-    x.fillStyle = gr;
-    x.fillRect(0, 0, 256, 256);
-    return c;
-  }
-  // Mostly cool lavender-grey mist with the occasional eerie green wisp.
-  const SPRITES = [
-    makePuffSprite(206, 202, 226),
-    makePuffSprite(188, 182, 216),
-    makePuffSprite(204, 206, 222),
-    makePuffSprite(168, 198, 182),
-  ];
-  const pickSprite = () => {
-    const r = Math.random();
-    return r < 0.38 ? SPRITES[0] : r < 0.72 ? SPRITES[1] : r < 0.9 ? SPRITES[2] : SPRITES[3];
-  };
+  /* ================================================================== *
+   * HAUNTED FRAME (static, drawn once; edges only)
+   * ================================================================== */
+  function drawFrame() {
+    const c = document.getElementById('frame');
+    const g = c.getContext('2d');
+    const DARK = (a) => `rgba(14,1,6,${a})`;
+    const RED  = (a) => `rgba(${CARDINAL},${a})`;
 
-  function newPuff(initial) {
-    const r = rand(130, 300);
-    const sx = rand(1.5, 2.8);              // stretched horizontally = low-lying fog bank
-    const sy = rand(0.4, 0.75);
-    const depth = Math.pow(Math.random(), 1.6);   // 0 = hugging the bottom edge
-    const halfW = r * sx;
-    return {
-      r, sx, sy,
-      x: initial ? rand(-halfW, W + halfW) : -halfW - rand(0, 250),
-      y0: H + 30 - depth * 330,
-      vx: rand(6, 18) * (0.75 + depth * 0.6),   // upper wisps drift slightly faster
-      a: rand(0.045, 0.09),
-      sprite: pickSprite(),
-      bobA: rand(4, 14), bobW: rand(0.05, 0.14), ph: rand(0, Math.PI * 2),
-      brW: rand(0.07, 0.18), ph2: rand(0, Math.PI * 2),
+    // Left edge, full height.
+    let gr = g.createLinearGradient(0, 0, 300, 0);
+    gr.addColorStop(0, DARK(0.8));
+    gr.addColorStop(0.3, RED(0.32));
+    gr.addColorStop(1, RED(0));
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 300, H);
+
+    // Right edge, faded out before the bottom-right clock area.
+    const tmp = document.createElement('canvas');
+    tmp.width = 300; tmp.height = H;
+    const t = tmp.getContext('2d');
+    gr = t.createLinearGradient(300, 0, 0, 0);
+    gr.addColorStop(0, DARK(0.8));
+    gr.addColorStop(0.3, RED(0.32));
+    gr.addColorStop(1, RED(0));
+    t.fillStyle = gr;
+    t.fillRect(0, 0, 300, H);
+    t.globalCompositeOperation = 'destination-out';
+    gr = t.createLinearGradient(0, 600, 0, 780);
+    gr.addColorStop(0, 'rgba(0,0,0,0)');
+    gr.addColorStop(1, 'rgba(0,0,0,1)');
+    t.fillStyle = gr;
+    t.fillRect(0, 600, 300, H - 600);
+    g.drawImage(tmp, W - 300, 0);
+
+    // Corner pools: top corners (under the webs) and a deep bottom-left for the pumpkins.
+    const pool = (x, y, r, a) => {
+      const rg = g.createRadialGradient(x, y, 0, x, y, r);
+      rg.addColorStop(0, DARK(a));
+      rg.addColorStop(0.45, RED(a * 0.35));
+      rg.addColorStop(1, RED(0));
+      g.fillStyle = rg;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
     };
+    pool(0, 0, 360, 0.55);
+    pool(W, 0, 360, 0.55);
+    pool(0, H, 560, 0.75);
   }
-  const puffs = [];
-  for (let i = 0; i < CONFIG.fogPuffs; i++) puffs.push(newPuff(true));
+  if (CONFIG.frame) drawFrame();
 
-  // Pre-rendered soft mask used to erase fog from the protected broadcast zones.
+  /* ================================================================== *
+   * Protected-zone mask (erases fog from the middle and the broadcast graphics)
+   * ================================================================== */
   function buildClearMask() {
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const m = c.getContext('2d');
-    const OFF = 10000;           // draw the rect off-canvas, keep only its blurred shadow
+    const OFF = 10000;               // draw shapes off-canvas, keep only their blurred shadows
     m.shadowOffsetX = OFF;
-    m.shadowBlur = 80;
     m.fillStyle = '#000';
+    m.shadowColor = 'rgba(0,0,0,1)';
+
+    // Middle of the field: big soft ellipse.
+    m.shadowBlur = 150;
+    m.beginPath();
+    m.ellipse(W / 2 - OFF, 560, 600, 470, 0, 0, Math.PI * 2);
+    m.fill();
+
+    m.shadowBlur = 70;
     for (const z of CONFIG.clearZones) {
       let { x, y, w, h } = z;
-      // Extend zones that touch a screen edge so the feathering doesn't fade there.
-      if (x <= 0)      { x -= 200; w += 200; }
-      if (x + w >= W)  { w += 200; }
-      if (y + h >= H)  { h += 200; }
-      m.shadowColor = `rgba(0,0,0,${z.strength})`;
+      if (x <= 0)     { x -= 200; w += 200; }
+      if (x + w >= W) { w += 200; }
+      if (y <= 0)     { y -= 200; h += 200; }
+      if (y + h >= H) { h += 200; }
+      if (y <= 0) { x += 280; w -= 560; }      // leave the top corners for the webs
       m.fillRect(x - OFF, y, w, h);
     }
     return c;
   }
   const clearMask = buildClearMask();
 
+  /* ================================================================== *
+   * FOG — rolls in from the side edges and pools in the bottom-left
+   * ================================================================== */
+  function makePuffSprite(r, g, b) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const x = c.getContext('2d');
+    const gr = x.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gr.addColorStop(0.00, `rgba(${r},${g},${b},1)`);
+    gr.addColorStop(0.35, `rgba(${r},${g},${b},0.62)`);
+    gr.addColorStop(0.70, `rgba(${r},${g},${b},0.2)`);
+    gr.addColorStop(1.00, `rgba(${r},${g},${b},0)`);
+    x.fillStyle = gr;
+    x.fillRect(0, 0, 256, 256);
+    return c;
+  }
+  const FOG_SPRITES = [
+    makePuffSprite(222, 220, 232),   // pale grey
+    makePuffSprite(205, 200, 222),   // lavender grey
+    makePuffSprite(232, 226, 228),   // warm white
+    makePuffSprite(214, 150, 160),   // lit cardinal
+  ];
+  const fogSprite = () => {
+    const r = Math.random();
+    return r < 0.34 ? FOG_SPRITES[0] : r < 0.64 ? FOG_SPRITES[1] : r < 0.88 ? FOG_SPRITES[2] : FOG_SPRITES[3];
+  };
+
+  function newPuff(initial) {
+    const r = Math.random();
+    let x, y, vx, vy;
+    if (r < 0.36) {            // left edge, full height
+      x = rand(-120, 110); y = rand(140, 1100);
+      vx = rand(3, 12); vy = rand(-10, -3);
+    } else if (r < 0.66) {     // right edge, above the clock area
+      x = rand(W - 110, W + 120); y = rand(110, 760);
+      vx = -rand(3, 12); vy = rand(-10, -3);
+    } else {                   // bottom-left ground fog
+      x = rand(-150, 470); y = rand(930, 1120);
+      vx = rand(2, 10); vy = rand(-5, -1);
+    }
+    const life = rand(14, 26);
+    return {
+      x, y, vx, vy,
+      rad: rand(110, 240), sx: rand(1, 1.7), sy: rand(0.7, 1.1),
+      a: rand(0.07, 0.13),
+      age: initial ? rand(0, life) : 0, life,
+      sprite: fogSprite(),
+      ph: rand(0, Math.PI * 2), wob: rand(0.1, 0.3),
+    };
+  }
+  const puffs = [];
+  for (let i = 0; i < 78; i++) puffs.push(newPuff(true));
+  let fogBoost = 0;            // temporary extra thickness (opponent scores)
+
   function drawFog(t, dt, glow) {
-    const boost = CONFIG.fogDensity * (1 + glow * 1.4);   // fog lights up during lightning
+    const k = CONFIG.fogDensity * (1 + glow * 1.3 + fogBoost);
     for (let i = 0; i < puffs.length; i++) {
       let p = puffs[i];
-      p.x += p.vx * dt;
-      const w = p.r * 2 * p.sx, h = p.r * 2 * p.sy;
-      if (p.x - w / 2 > W) { p = puffs[i] = newPuff(false); continue; }
-
-      const y = p.y0 + Math.sin(t * p.bobW + p.ph) * p.bobA;
-      let a = p.a * (0.7 + 0.3 * Math.sin(t * p.brW + p.ph2)) * boost;
-      a *= smoothstep(700, 880, y);          // fade out toward the top of the bottom third
-      if (a <= 0.001) continue;
+      p.age += dt;
+      if (p.age >= p.life) { p = puffs[i] = newPuff(false); }
+      p.x += p.vx * dt + Math.sin(t * p.wob + p.ph) * 4 * dt;
+      p.y += p.vy * dt;
+      const u = p.age / p.life;
+      const env = Math.sin(Math.PI * u);
+      const a = p.a * env * k;
+      if (a <= 0.002) continue;
+      const w = p.rad * 2 * p.sx, h = p.rad * 2 * p.sy;
       ctx.globalAlpha = Math.min(1, a);
-      ctx.drawImage(p.sprite, p.x - w / 2, y - h / 2, w, h);
+      ctx.drawImage(p.sprite, p.x - w / 2, p.y - h / 2, w, h);
     }
     ctx.globalAlpha = 1;
-
-    // Knock the fog out of the score bug / clock zones (soft edges).
     ctx.globalCompositeOperation = 'destination-out';
     ctx.drawImage(clearMask, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  /* ------------------------------------------------------------------ *
-   * BATS
-   * ------------------------------------------------------------------ */
-  const bats = [];
-  let nextSwoop = rand(4, 8);   // first swoop shortly after load
+  /* ================================================================== *
+   * GHOSTS — peek in from the side edges or drift up them
+   * ================================================================== */
+  const ghosts = [];
+  let nextGhost = rand(6, 12);
 
-  function spawnSwoop() {
-    const r = Math.random();
-    const n = r < 0.45 ? 1 : r < 0.78 ? 2 : r < 0.93 ? 3 : 4;
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    const top = CONFIG.topClearHeight + 30;
-    const baseY = rand(top, top + 150);
-    const dip = Math.random() < 0.8 ? rand(40, 120) : -rand(10, 25);   // mostly swoop down then up
-    const speed = rand(380, 600);
-    let lag = 0;
+  function spawnGhost(opts = {}) {
+    const side = opts.side || (Math.random() < 0.55 ? 'L' : 'R');
+    const kind = opts.kind || (Math.random() < 0.55 ? 'peek' : 'rise');
+    const size = opts.size || rand(95, 140);
+    const g = {
+      side, kind, size,
+      born: nowS(),
+      dur: opts.dur || (kind === 'peek' ? rand(9, 12) : rand(12, 16)),
+      ph: rand(0, Math.PI * 2),
+      speed: opts.speed || rand(45, 65),
+      alpha: opts.alpha || rand(0.6, 0.78),
+      look: 0,
+    };
+    if (kind === 'peek') {
+      g.y = side === 'L' ? rand(300, 760) : rand(240, 600);
+    } else {
+      g.x0 = side === 'L' ? rand(70, 210) : W - rand(70, 210);
+      g.y0 = side === 'L' ? rand(980, 1060) : rand(700, 760);
+    }
+    ghosts.push(g);
+  }
+
+  function drawGhost(x, y, s, t, alpha, lean, look) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(lean);
+    ctx.scale(s, s);
+    ctx.globalAlpha = alpha;
+
+    // Body: dome head, flowing sides and a wavy, animated tail.
+    const grad = ctx.createLinearGradient(0, -0.55, 0, 0.85);
+    grad.addColorStop(0, 'rgba(250,250,255,0.95)');
+    grad.addColorStop(0.55, 'rgba(225,232,255,0.75)');
+    grad.addColorStop(1, 'rgba(200,215,255,0)');
+    ctx.fillStyle = grad;
+    ctx.shadowColor = 'rgba(190,215,255,0.85)';
+    ctx.shadowBlur = 28;
+
+    const sway = Math.sin(t * 1.7) * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(-0.42, 0.05);
+    ctx.bezierCurveTo(-0.46, -0.62, 0.46, -0.62, 0.42, 0.05);
+    ctx.quadraticCurveTo(0.46 + sway, 0.45, 0.4 + sway * 2, 0.8);
+    const n = 4;
     for (let i = 0; i < n; i++) {
-      const x = dir > 0 ? -60 - lag : W + 60 + lag;
-      bats.push({
-        dir, x, px: x,
-        baseY: baseY + rand(-30, 30),
-        y: baseY, py: baseY,
-        dip: dip * rand(0.8, 1.2),
-        speed: speed * rand(0.92, 1.08),
-        size: rand(15, 25),                 // half-wingspan in px
-        flapF: rand(6.5, 10),
-        ph: rand(0, Math.PI * 2),
-        wobF: rand(1.5, 3), wobPh: rand(0, Math.PI * 2),
-        glideF: rand(0.6, 1.1),
-      });
-      lag += rand(50, 160);
+      const x1 = 0.4 - (i + 1) * (0.8 / n) + sway * 2;
+      const xm = 0.4 - (i + 0.5) * (0.8 / n) + sway * 2;
+      const yy = 0.8 + Math.sin(t * 4 + i * 1.7) * 0.05;
+      ctx.quadraticCurveTo(xm, yy - 0.16, x1, yy);
+    }
+    ctx.quadraticCurveTo(-0.46 + sway, 0.45, -0.42, 0.05);
+    ctx.fill();
+
+    // Face.
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(28,10,22,0.9)';
+    const lx = look * 0.05;
+    ctx.beginPath();
+    ctx.ellipse(-0.15 + lx, -0.12, 0.075, 0.115, 0, 0, Math.PI * 2);
+    ctx.moveTo(0.225 + lx, -0.12);
+    ctx.ellipse(0.15 + lx, -0.12, 0.075, 0.115, 0, 0, Math.PI * 2);
+    ctx.moveTo(0.06 + lx, 0.13);
+    ctx.ellipse(lx, 0.13, 0.06, 0.085 + Math.sin(t * 2.3) * 0.015, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function updateGhosts(t) {
+    if (CONFIG.ghosts && t >= nextGhost) {
+      spawnGhost();
+      nextGhost = t + rand(CONFIG.ghostMin, CONFIG.ghostMax);
+    }
+    for (let i = ghosts.length - 1; i >= 0; i--) {
+      const g = ghosts[i];
+      const e = t - g.born;
+      if (e > g.dur) { ghosts.splice(i, 1); continue; }
+      const u = e / g.dur;
+      const dir = g.side === 'L' ? 1 : -1;
+      let x, y, a, lean;
+
+      if (g.kind === 'peek') {
+        // Slide in from off-screen, hover and look around, slide back out.
+        const inT = 2.4, outT = 2.4;
+        let p = e < inT ? easeInOut(e / inT) : e > g.dur - outT ? easeInOut((g.dur - e) / outT) : 1;
+        const hidden = -g.size * 0.6, shown = g.size * 0.9;
+        const off = hidden + (shown - hidden) * p;
+        x = g.side === 'L' ? off : W - off;
+        y = g.y + Math.sin(t * 1.3 + g.ph) * 12;
+        a = g.alpha * Math.min(1, p * 1.6);
+        lean = dir * (0.25 - p * 0.15) + Math.sin(t * 0.9 + g.ph) * 0.05;
+        g.look = dir * (0.6 + Math.sin(t * 0.7 + g.ph) * 0.8);
+      } else {
+        // Drift up the edge with a lazy sway.
+        x = g.x0 + Math.sin(t * 0.8 + g.ph) * 30;
+        y = g.y0 - e * g.speed;
+        a = g.alpha * Math.min(1, e / 1.5, (g.dur - e) / 2);
+        lean = Math.cos(t * 0.8 + g.ph) * 0.12;
+        g.look = dir * Math.sin(t * 0.5 + g.ph);
+        if (y < 40) { a *= clamp((y + 60) / 100, 0, 1); }
+      }
+      if (a > 0.01) drawGhost(x, y, g.size, t + g.ph, a, lean, g.look);
     }
   }
 
+  /* ================================================================== *
+   * GLOWING EYES in the dark edges
+   * ================================================================== */
+  const EYE_SPOTS = [
+    [70, 330], [60, 520], [95, 700], [55, 860],       // left edge
+    [W - 70, 300], [W - 60, 470], [W - 95, 620],      // right edge (above the clock)
+    [210, 820], [330, 870],                           // above the pumpkin patch
+    [150, 300], [W - 150, 280],                       // under the webs
+  ];
+  const eyes = [];
+  let nextEyes = rand(3, 6);
+  let eyesParty = 0;          // >0 during celebrations: every spot lights up
+
+  function spawnEyes(spot, opts = {}) {
+    const used = new Set(eyes.map(e => e.spot));
+    if (spot == null) {
+      const free = EYE_SPOTS.map((_, i) => i).filter(i => !used.has(i));
+      if (!free.length) return;
+      spot = pick(free);
+    } else if (used.has(spot)) return;
+    const [x, y] = EYE_SPOTS[spot];
+    eyes.push({
+      spot, x: x + rand(-15, 15), y: y + rand(-15, 15),
+      born: nowS(), dur: opts.dur || rand(9, 20),
+      size: rand(1.15, 1.6),
+      color: opts.color || (Math.random() < 0.7 ? GOLD : '255,70,50'),
+      nextBlink: nowS() + rand(1.5, 4), blinkAt: -1,
+      ph: rand(0, Math.PI * 2),
+    });
+  }
+
+  function drawEyePair(e, t, a) {
+    const s = e.size;
+    const blink = e.blinkAt > 0 ? Math.abs(Math.cos(clamp((t - e.blinkAt) / 0.18, 0, 1) * Math.PI)) : 1;
+    const open = Math.max(0.08, blink);
+    const look = Math.sin(t * 0.6 + e.ph) * 2.2;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.scale(s, s);
+    ctx.globalAlpha = a;
+    ctx.shadowColor = `rgba(${e.color},0.95)`;
+    ctx.shadowBlur = 14;
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(side * 13, 0);
+      ctx.rotate(side * 0.22);           // angled inward = menacing
+      ctx.scale(1, open);
+      ctx.fillStyle = `rgba(${e.color},1)`;
+      ctx.beginPath();
+      ctx.moveTo(-9, 0);
+      ctx.quadraticCurveTo(0, -8, 9, 0);
+      ctx.quadraticCurveTo(0, 6, -9, 0);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(20,4,8,0.9)';
+      ctx.beginPath();
+      ctx.ellipse(look, -0.5, 1.4, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function updateEyes(t) {
+    if (t >= nextEyes && eyes.length < 3) {
+      spawnEyes();
+      nextEyes = t + rand(4, 10);
+    }
+    if (eyesParty > t) {
+      for (let i = 0; i < EYE_SPOTS.length; i++) spawnEyes(i, { dur: eyesParty - t + rand(0, 1.5), color: GOLD });
+    }
+    for (let i = eyes.length - 1; i >= 0; i--) {
+      const e = eyes[i];
+      const age = t - e.born;
+      if (age > e.dur) { eyes.splice(i, 1); continue; }
+      if (t >= e.nextBlink) { e.blinkAt = t; e.nextBlink = t + rand(2, 6); }
+      if (e.blinkAt > 0 && t - e.blinkAt > 0.18) e.blinkAt = -1;
+      const a = Math.min(1, age / 1.4, (e.dur - age) / 1.4) * (0.85 + 0.15 * Math.sin(t * 2 + e.ph));
+      drawEyePair(e, t, a);
+    }
+  }
+
+  /* ================================================================== *
+   * EMBERS (celebrations): cardinal & gold sparks rising from the edges
+   * ================================================================== */
+  const embers = [];
+  function burstEmbers(count) {
+    for (let i = 0; i < count; i++) {
+      const r = Math.random();
+      let x, y;
+      if (r < 0.4)      { x = rand(0, 260);       y = rand(700, 1100); }
+      else if (r < 0.7) { x = rand(W - 260, W);   y = rand(400, 760); }
+      else              { x = rand(0, 440);       y = rand(980, 1090); }
+      embers.push({
+        x, y, vx: rand(-25, 25), vy: -rand(90, 220),
+        life: rand(2.2, 4.2), age: -rand(0, 1.5),
+        r: rand(2, 4.5), color: Math.random() < 0.55 ? GOLD : '220,50,70', ph: rand(0, 6.3),
+      });
+    }
+  }
+  function updateEmbers(t, dt) {
+    if (!embers.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = embers.length - 1; i >= 0; i--) {
+      const p = embers[i];
+      p.age += dt;
+      if (p.age < 0) continue;
+      if (p.age > p.life) { embers.splice(i, 1); continue; }
+      p.x += (p.vx + Math.sin(t * 3 + p.ph) * 30) * dt;
+      p.y += p.vy * dt;
+      const a = Math.min(1, (p.life - p.age) / 1.2) * (0.7 + 0.3 * Math.sin(t * 12 + p.ph));
+      const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
+      gr.addColorStop(0, `rgba(${p.color},${a})`);
+      gr.addColorStop(0.3, `rgba(${p.color},${a * 0.5})`);
+      gr.addColorStop(1, `rgba(${p.color},0)`);
+      ctx.fillStyle = gr;
+      ctx.fillRect(p.x - p.r * 4, p.y - p.r * 4, p.r * 8, p.r * 8);
+    }
+    ctx.restore();
+  }
+
+  /* ================================================================== *
+   * BATS (only burst out of the frame edges when lightning strikes)
+   * ================================================================== */
+  const bats = [];
+  function batBurst(side, n) {
+    for (let i = 0; i < n; i++) {
+      const L = side === 'L';
+      bats.push({
+        x: L ? rand(-40, 60) : W - rand(-40, 60),
+        y: rand(260, 560),
+        vx: (L ? 1 : -1) * rand(40, 110), vy: -rand(220, 340),
+        size: rand(13, 20), flapF: rand(8, 11), ph: rand(0, 6.3), delay: i * rand(0.08, 0.2),
+      });
+    }
+  }
   function batWing(m, f) {
-    const tipY = -0.62 * f;
-    const jY = -0.28 * f;
+    const tipY = -0.62 * f, jY = -0.28 * f;
     ctx.moveTo(0.06 * m, -0.08);
-    ctx.quadraticCurveTo(0.30 * m, -0.27 + jY * 0.6, 0.48 * m, -0.12 + jY);   // leading edge to wrist
-    ctx.lineTo(1.00 * m, -0.05 + tipY);                                       // wing tip
-    // scalloped trailing edge back to the body
+    ctx.quadraticCurveTo(0.30 * m, -0.27 + jY * 0.6, 0.48 * m, -0.12 + jY);
+    ctx.lineTo(1.00 * m, -0.05 + tipY);
     ctx.quadraticCurveTo(0.82 * m, 0.00 + tipY * 0.6, 0.76 * m, 0.14 + tipY * 0.55);
     ctx.quadraticCurveTo(0.62 * m, 0.06 + jY * 0.8,   0.50 * m, 0.20 + jY * 0.7);
     ctx.quadraticCurveTo(0.36 * m, 0.10 + jY * 0.4,   0.24 * m, 0.24 + jY * 0.3);
     ctx.quadraticCurveTo(0.14 * m, 0.14,              0.05 * m, 0.14);
     ctx.closePath();
   }
-
-  function drawBat(x, y, s, f, tilt) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(tilt);
-    ctx.scale(s, s);
-    ctx.beginPath();
-    batWing(1, f);
-    batWing(-1, f);
-    // body
-    ctx.moveTo(0.085, 0.04);
-    ctx.ellipse(0, 0.04, 0.085, 0.16, 0, 0, Math.PI * 2);
-    // head
-    ctx.moveTo(0.07, -0.13);
-    ctx.arc(0, -0.13, 0.07, 0, Math.PI * 2);
-    // ears
-    ctx.moveTo(-0.06, -0.16); ctx.lineTo(-0.08, -0.27); ctx.lineTo(-0.02, -0.19); ctx.closePath();
-    ctx.moveTo( 0.06, -0.16); ctx.lineTo( 0.08, -0.27); ctx.lineTo( 0.02, -0.19); ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-
   function updateBats(t, dt) {
-    if (t >= nextSwoop) {
-      spawnSwoop();
-      nextSwoop = t + rand(CONFIG.batMin, Math.max(CONFIG.batMin, CONFIG.batMax));
-    }
     if (!bats.length) return;
-
-    ctx.fillStyle = 'rgba(12, 7, 16, 0.85)';
-    ctx.shadowColor = 'rgba(150, 100, 210, 0.35)';   // faint rim so bats read on dark shots too
+    ctx.fillStyle = 'rgba(12,6,10,0.9)';
+    ctx.shadowColor = `rgba(${CARDINAL},0.6)`;
     ctx.shadowBlur = 6;
-
     for (let i = bats.length - 1; i >= 0; i--) {
       const b = bats[i];
-      b.px = b.x; b.py = b.y;
-      b.x += b.dir * b.speed * dt;
-      const u = clamp(b.dir > 0 ? b.x / W : 1 - b.x / W, 0, 1);
-      b.y = b.baseY + b.dip * Math.sin(Math.PI * u) + Math.sin(t * b.wobF + b.wobPh) * 9;
-
-      if ((b.dir > 0 && b.x > W + 80) || (b.dir < 0 && b.x < -80)) { bats.splice(i, 1); continue; }
-
-      // Flap, with occasional short glides.
-      const glide = Math.max(0, Math.sin(t * b.glideF + b.ph)) > 0.85 ? 0.25 : 1;
-      const f = Math.sin(t * b.flapF * Math.PI * 2 + b.ph) * glide + (1 - glide) * 0.35;
-      const tilt = Math.atan2(b.y - b.py, Math.abs(b.x - b.px) || 1) * 0.6 * b.dir;
-      drawBat(b.x, b.y, b.size, f, tilt);
+      if (b.delay > 0) { b.delay -= dt; continue; }
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.y < -60) { bats.splice(i, 1); continue; }
+      const f = Math.sin(t * b.flapF * Math.PI * 2 + b.ph);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx) + Math.PI / 2);
+      ctx.scale(b.size, b.size);
+      ctx.beginPath();
+      batWing(1, f); batWing(-1, f);
+      ctx.moveTo(0.085, 0.04); ctx.ellipse(0, 0.04, 0.085, 0.16, 0, 0, Math.PI * 2);
+      ctx.moveTo(0.07, -0.13); ctx.arc(0, -0.13, 0.07, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
-
     ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
   }
 
-  /* ------------------------------------------------------------------ *
-   * LIGHTNING
-   * ------------------------------------------------------------------ */
+  /* ================================================================== *
+   * LIGHTNING — corner flash + a jagged bolt down one side edge
+   * ================================================================== */
   const flash = document.getElementById('flash');
   let flashStart = -1e9;
+  const bolts = [];
 
-  function strike() {
-    const k = CONFIG.lightningStrength;
-    // Light comes from one of the upper corners, never dead-center over the score bug.
-    const fromX = Math.random() < 0.5 ? rand(4, 28) : rand(72, 96);
+  function makeBolt(side) {
+    const L = side === 'L';
+    const x0 = L ? rand(40, 200) : W - rand(40, 200);
+    const x1 = L ? rand(20, 230) : W - rand(20, 230);
+    const y1 = rand(380, 620);
+    let pts = [[x0, -20], [x1, y1]];
+    let disp = 70;
+    for (let k = 0; k < 6; k++) {
+      const next = [pts[0]];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+        let mx = (ax + bx) / 2 + rand(-disp, disp);
+        mx = L ? clamp(mx, 5, 270) : clamp(mx, W - 270, W - 5);
+        next.push([mx, (ay + by) / 2], pts[i + 1]);
+      }
+      pts = next;
+      disp *= 0.55;
+    }
+    const branches = [];
+    for (let b = 0; b < 2; b++) {
+      const startI = Math.floor(rand(pts.length * 0.25, pts.length * 0.7));
+      let [bx, by] = pts[startI];
+      const br = [[bx, by]];
+      const dir = L ? (Math.random() < 0.5 ? 1 : -0.6) : (Math.random() < 0.5 ? -1 : 0.6);
+      for (let s = 0; s < 8; s++) {
+        bx += dir * rand(4, 16); by += rand(10, 24);
+        bx = L ? clamp(bx, 5, 290) : clamp(bx, W - 290, W - 5);
+        br.push([bx, by]);
+      }
+      branches.push(br);
+    }
+    return { pts, branches, born: nowS() };
+  }
+
+  function drawBolts(t) {
+    for (let i = bolts.length - 1; i >= 0; i--) {
+      const b = bolts[i];
+      const e = t - b.born;
+      if (e > 0.75) { bolts.splice(i, 1); continue; }
+      const a = (e < 0.08 ? 1 : e < 0.16 ? 0.25 : e < 0.3 ? 0.9 : Math.max(0, 1 - (e - 0.3) / 0.45));
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.shadowColor = b.gold ? `rgba(${GOLD},1)` : 'rgba(200,170,255,1)';
+      ctx.shadowBlur = 24;
+      const path = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const p of pts) ctx.lineTo(p[0], p[1]); ctx.stroke(); };
+      ctx.strokeStyle = b.gold ? `rgba(255,236,170,${a})` : `rgba(240,235,255,${a})`;
+      ctx.lineWidth = 3.2;
+      path(b.pts);
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = `rgba(255,255,255,${a})`;
+      path(b.pts);
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = `rgba(230,225,255,${a * 0.75})`;
+      for (const br of b.branches) path(br);
+      ctx.restore();
+    }
+  }
+
+  function strike(opts = {}) {
+    const side = opts.side || (Math.random() < 0.5 ? 'L' : 'R');
+    const fromX = side === 'L' ? rand(0, 15) : rand(85, 100);
+    const k = opts.strength || 1;
+    const c1 = opts.gold ? '255,240,200' : '242,236,255';
+    const c2 = opts.gold ? GOLD : '190,150,255';
+    const c3 = opts.gold ? CARDINAL : '125,75,205';
     flash.style.background =
-      `radial-gradient(ellipse 85% 80% at ${fromX}% -12%,` +
-      ` rgba(242,236,255,${(0.55 * k).toFixed(3)}) 0%,` +
-      ` rgba(190,150,255,${(0.32 * k).toFixed(3)}) 32%,` +
-      ` rgba(125,75,205,${(0.14 * k).toFixed(3)}) 62%,` +
-      ` rgba(80,40,160,0) 100%)`;
-    const dur = rand(0.65, 0.95);
-    flash.style.animationDuration = dur.toFixed(2) + 's';
+      `radial-gradient(ellipse 70% 95% at ${fromX}% 0%,` +
+      ` rgba(${c1},${(0.7 * k).toFixed(3)}) 0%,` +
+      ` rgba(${c2},${(0.38 * k).toFixed(3)}) 28%,` +
+      ` rgba(${c3},${(0.14 * k).toFixed(3)}) 58%,` +
+      ` rgba(${c3},0) 85%)`;
+    flash.style.animationDuration = rand(0.75, 1).toFixed(2) + 's';
     flash.classList.remove('strike');
-    void flash.offsetWidth;            // restart the CSS animation
+    void flash.offsetWidth;
     flash.classList.add('strike');
     flashStart = performance.now();
+    const bolt = makeBolt(side);
+    bolt.gold = !!opts.gold;
+    bolts.push(bolt);
+    if (opts.bats !== false && Math.random() < (opts.batChance ?? 0.5)) batBurst(side, Math.floor(rand(3, 6)));
   }
 
   function scheduleLightning() {
-    const min = CONFIG.lightningMin, max = Math.max(CONFIG.lightningMin, CONFIG.lightningMax);
+    const min = CONFIG.lightningMin, max = Math.max(min, CONFIG.lightningMax);
     setTimeout(() => { strike(); scheduleLightning(); }, rand(min, max) * 1000);
   }
-
-  function lightningGlow(now) {
+  const lightningGlow = (now) => {
     const e = now - flashStart;
-    if (e < 0 || e > 900) return 0;
-    return Math.pow(1 - e / 900, 2);
-  }
+    return e < 0 || e > 1000 ? 0 : Math.pow(1 - e / 1000, 2);
+  };
 
-  /* ------------------------------------------------------------------ *
-   * SPIDERWEBS (generated SVG, seeded so they look the same every load)
-   * ------------------------------------------------------------------ */
+  /* ================================================================== *
+   * SPIDERWEBS (seeded SVG) + spider
+   * ================================================================== */
   function mulberry32(a) {
     return function () {
       a |= 0; a = (a + 0x6D2B79F5) | 0;
@@ -449,140 +859,363 @@
     const R = mulberry32(seed);
     const r = (a, b) => a + (b - a) * R();
     const f = (v) => v.toFixed(1);
-
     const hx = r(10, 20), hy = r(8, 16);
-    const N = 9;
-    const angles = [], lens = [];
+    const N = 9, angles = [], lens = [];
     for (let i = 0; i < N; i++) {
       const base = 0.05 + (i / (N - 1)) * (Math.PI / 2 - 0.1);
-      const jit = (i === 0 || i === N - 1) ? 0 : r(-0.06, 0.06);
-      angles.push(base + jit);
+      angles.push(base + ((i === 0 || i === N - 1) ? 0 : r(-0.06, 0.06)));
       lens.push(S * r(0.8, 1.05));
     }
-
+    const pt = (a, d) => [hx + Math.cos(a) * d, hy + Math.sin(a) * d];
     let spokes = '', rings = '', strands = '';
     const dews = [];
-    const pt = (a, d) => [hx + Math.cos(a) * d, hy + Math.sin(a) * d];
-
     for (let i = 0; i < N; i++) {
       const [x, y] = pt(angles[i], lens[i]);
       spokes += `M${f(hx)},${f(hy)}L${f(x)},${f(y)}`;
     }
-    // Anchor threads tying the outermost spokes to the screen edges.
-    { const [x, y] = pt(angles[0], lens[0] * 0.7);     spokes += `M${f(x)},${f(y)}L${f(x + r(15, 40))},0`; }
+    { const [x, y] = pt(angles[0], lens[0] * 0.7);         spokes += `M${f(x)},${f(y)}L${f(x + r(15, 40))},0`; }
     { const [x, y] = pt(angles[N - 1], lens[N - 1] * 0.7); spokes += `M${f(x)},${f(y)}L0,${f(y + r(15, 40))}`; }
-
-    // Capture spiral: sagging arcs between neighbouring spokes.
     let rad = S * 0.05;
     for (let k = 0; k < 12; k++) {
       rad += S * r(0.065, 0.085);
       for (let i = 0; i < N - 1; i++) {
         if (rad > Math.min(lens[i], lens[i + 1]) * 0.95) continue;
-        const r1 = rad * r(0.97, 1.03), r2 = rad * r(0.97, 1.03);
-        const [x1, y1] = pt(angles[i], r1);
-        const [x2, y2] = pt(angles[i + 1], r2);
+        const [x1, y1] = pt(angles[i], rad * r(0.97, 1.03));
+        const [x2, y2] = pt(angles[i + 1], rad * r(0.97, 1.03));
         if (R() < 0.06) {
-          // broken thread, left dangling for that abandoned-gothic look
           strands += `M${f(x1)},${f(y1)}Q${f(x1 + r(-6, 6))},${f(y1 + 14)} ${f(x1 + r(-3, 3))},${f(y1 + r(18, 40))}`;
           continue;
         }
-        const mid = (angles[i] + angles[i + 1]) / 2;
-        const [cx, cy] = pt(mid, rad * r(0.83, 0.9));
+        const [cx, cy] = pt((angles[i] + angles[i + 1]) / 2, rad * r(0.83, 0.9));
         rings += `M${f(x1)},${f(y1)}Q${f(cx)},${f(cy)} ${f(x2)},${f(y2)}`;
         if (R() < 0.05) dews.push([x1, y1, r(1.1, 2)]);
       }
     }
-
-    const thread = 'rgba(232,226,246,';
+    const thread = 'rgba(236,230,246,';
     let svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">` +
       `<g fill="none" stroke-linecap="round">` +
-        // dark under-stroke keeps the thin threads visible over bright shots
-        `<g stroke="rgba(0,0,0,0.32)" stroke-width="2.6">` +
-          `<path d="${spokes}"/><path d="${rings}"/><path d="${strands}"/>` +
-        `</g>` +
-        `<path d="${spokes}" stroke="${thread}0.55)" stroke-width="1.3"/>` +
-        `<path d="${rings}" stroke="${thread}0.42)" stroke-width="0.9"/>` +
-        `<path d="${strands}" stroke="${thread}0.35)" stroke-width="0.8"/>` +
+        `<g stroke="rgba(0,0,0,0.35)" stroke-width="2.8"><path d="${spokes}"/><path d="${rings}"/><path d="${strands}"/></g>` +
+        `<path d="${spokes}" stroke="${thread}0.62)" stroke-width="1.4"/>` +
+        `<path d="${rings}" stroke="${thread}0.5)" stroke-width="1"/>` +
+        `<path d="${strands}" stroke="${thread}0.4)" stroke-width="0.8"/>` +
       `</g>`;
-
     for (const [x, y, rr] of dews) {
-      svg += `<circle class="dew" cx="${f(x)}" cy="${f(y)}" r="${f(rr)}" fill="rgba(240,236,255,0.9)" ` +
-             `style="animation-delay:${(-R() * 6).toFixed(2)}s"/>`;
+      svg += `<circle class="dew" cx="${f(x)}" cy="${f(y)}" r="${f(rr)}" fill="rgba(240,236,255,0.9)" style="animation-delay:${(-R() * 6).toFixed(2)}s"/>`;
     }
-
     if (withSpider) {
       const sx = f(S * 0.46), restY = S * 0.68;
       svg +=
         `<g transform="translate(${sx},0)"><g class="spider">` +
-          `<line x1="0" y1="-${S}" x2="0" y2="${f(restY - 4)}" stroke="${thread}0.5)" stroke-width="0.8"/>` +
-          `<g transform="translate(0,${f(restY)})" fill="#0e0913" stroke="#0e0913" stroke-linecap="round">` +
+          `<line x1="0" y1="-${S}" x2="0" y2="${f(restY - 4)}" stroke="${thread}0.55)" stroke-width="0.9"/>` +
+          `<g transform="translate(0,${f(restY)}) scale(1.35)" fill="#0e0913" stroke="#0e0913" stroke-linecap="round">` +
             `<g fill="none" stroke-width="1.2">` +
               `<path d="M-2,-2Q-8,-9 -12,-4M-2,-0.5Q-9,-5 -13,1M-2,1Q-9,1 -12,6M-2,2.5Q-7,5 -9,10"/>` +
               `<path d="M2,-2Q8,-9 12,-4M2,-0.5Q9,-5 13,1M2,1Q9,1 12,6M2,2.5Q7,5 9,10"/>` +
             `</g>` +
-            `<ellipse cx="0" cy="-1.5" rx="2.8" ry="2.6" stroke="rgba(200,180,235,0.35)" stroke-width="0.6"/>` +
-            `<ellipse cx="0" cy="4.2" rx="4.2" ry="5.2" stroke="rgba(200,180,235,0.35)" stroke-width="0.6"/>` +
+            `<ellipse cx="0" cy="-1.5" rx="2.8" ry="2.6" stroke="rgba(220,170,180,0.4)" stroke-width="0.6"/>` +
+            `<ellipse cx="0" cy="4.2" rx="4.2" ry="5.2" stroke="rgba(220,170,180,0.4)" stroke-width="0.6"/>` +
+            `<path d="M-1.6,3 L0,6.5 L1.6,3 Z" fill="rgb(${CARDINAL})" stroke="none"/>` +
           `</g>` +
         `</g></g>`;
     }
-
     return svg + `</svg>`;
   }
-
   if (CONFIG.webs) {
-    document.getElementById('webLeft').innerHTML  = buildWebSVG(1031, 290, CONFIG.spider);
-    document.getElementById('webRight').innerHTML = buildWebSVG(31337, 260, false);
+    document.getElementById('webLeft').innerHTML  = buildWebSVG(1031, 310, true);
+    document.getElementById('webRight').innerHTML = buildWebSVG(31337, 280, false);
   }
 
-  /* ------------------------------------------------------------------ *
-   * Debug / preview mode
-   * ------------------------------------------------------------------ */
+  /* ================================================================== *
+   * PUMPKIN PATCH + TOMBSTONE (bottom-left corner)
+   * ================================================================== */
+  function pumpkinSVG(cx, by, w, h, id, face) {
+    // Ribbed pumpkin built from overlapping ellipses.
+    const ribs = [];
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const off = (i - (n - 1) / 2) / ((n - 1) / 2);         // -1..1
+      const rw = w * (0.34 - Math.abs(off) * 0.06);
+      ribs.push({ x: cx + off * w * 0.31, rw, z: Math.abs(off) });
+    }
+    ribs.sort((a, b) => b.z - a.z);
+    const cy = by - h / 2;
+    let s = '';
+    s += `<ellipse cx="${cx}" cy="${by - 4}" rx="${w * 0.62}" ry="${h * 0.12}" fill="rgba(0,0,0,0.45)"/>`;
+    for (const r of ribs) {
+      s += `<ellipse cx="${r.x}" cy="${cy}" rx="${r.rw}" ry="${h / 2}" fill="url(#pk${id})" stroke="rgba(90,30,0,0.55)" stroke-width="1.5"/>`;
+    }
+    s += `<path d="M${cx - 5},${cy - h / 2 + 6} q2,-${h * 0.22} ${12},-${h * 0.26} l4,6 q-8,4 -8,${h * 0.22} z" fill="#3f4d1c" stroke="#2a3311" stroke-width="1.5"/>`;
+    s += `<g class="glow ${face.flicker}" filter="url(#glowF)">${face.svg}</g>`;
+    return s;
+  }
+
+  function buildPatch() {
+    const defs =
+      `<defs>` +
+        `<radialGradient id="pkA" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="#ff9a2e"/><stop offset="0.6" stop-color="#e06a12"/><stop offset="1" stop-color="#8f3a06"/></radialGradient>` +
+        `<radialGradient id="pkB" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="#ffa63d"/><stop offset="0.6" stop-color="#d9621a"/><stop offset="1" stop-color="#7d3105"/></radialGradient>` +
+        `<radialGradient id="faceG" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#fff6c8"/><stop offset="0.5" stop-color="#ffd24a"/><stop offset="1" stop-color="#ff9c1a"/></radialGradient>` +
+        `<radialGradient id="groundGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="rgba(255,190,60,0.45)"/><stop offset="1" stop-color="rgba(255,150,40,0)"/></radialGradient>` +
+        `<linearGradient id="stone" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7d7a86"/><stop offset="0.6" stop-color="#55525e"/><stop offset="1" stop-color="#34323b"/></linearGradient>` +
+        `<filter id="glowF" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` +
+      `</defs>`;
+
+    // Tombstone (behind the pumpkins).
+    const tomb =
+      `<g transform="translate(-2,62) scale(0.9)">` +
+        `<path d="M10,182 L10,62 Q10,8 70,8 Q130,8 130,62 L130,182 Z" fill="url(#stone)" stroke="#24222a" stroke-width="3"/>` +
+        `<path d="M28,40 q8,-6 10,4 M108,150 q6,4 2,12 M22,120 l8,6 l-3,9" fill="none" stroke="rgba(30,28,36,0.6)" stroke-width="2"/>` +
+        `<text x="70" y="70" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="30" fill="#2a2830" stroke="rgba(255,255,255,0.12)" stroke-width="0.8">R.I.P.</text>` +
+        `<text x="70" y="104" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="17" letter-spacing="1" fill="#2a2830" stroke="rgba(255,255,255,0.1)" stroke-width="0.6">BUCKEYES</text>` +
+        `<text x="70" y="128" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="13" fill="#2a2830">10 · 31 · 26</text>` +
+        `<path d="M0,182 q20,-14 40,-4 q20,-12 44,-2 q24,-12 56,6 z" fill="#1b2412"/>` +
+      `</g>`;
+
+    // Big pumpkin: classic jack-o'-lantern face.
+    const bigFace = {
+      flicker: 'flicker-a',
+      svg:
+        `<g transform="translate(18,0)"><path d="M196,130 l18,-24 l16,24 z M248,130 l16,-24 l18,24 z" fill="url(#faceG)"/>` +
+        `<path d="M232,150 l8,-12 l8,12 z" fill="url(#faceG)"/>` +
+        `<path d="M186,162 q54,40 108,0 l-10,4 l-6,10 l-8,-8 l-10,10 l-10,-10 l-10,10 l-10,-10 l-10,10 l-8,-8 l-6,-8 z" fill="url(#faceG)"/></g>`,
+    };
+    // Small pumpkin carved with "SC".
+    const smallFace = {
+      flicker: 'flicker-b',
+      svg:
+        `<text x="395" y="190" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="44" fill="url(#faceG)">SC</text>`,
+    };
+
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="470" height="230" viewBox="0 0 470 230">` +
+        defs +
+        `<ellipse class="glow flicker-c" cx="285" cy="214" rx="230" ry="44" fill="url(#groundGlow)"/>` +
+        tomb +
+        pumpkinSVG(258, 228, 190, 140, 'A', bigFace) +
+        pumpkinSVG(395, 228, 120, 90, 'B', smallFace) +
+      `</svg>`;
+    document.getElementById('patch').innerHTML = svg;
+  }
+  if (CONFIG.pumpkins) buildPatch();
+
+  /* ================================================================== *
+   * CELEBRATIONS
+   * ================================================================== */
+  const banner = document.getElementById('banner');
+  const patch = document.getElementById('patch');
+
+  function showBanner(big, small, durS, boo) {
+    banner.querySelector('.big').textContent = big;
+    banner.querySelector('.small').textContent = small || '';
+    banner.classList.toggle('boo', !!boo);
+    banner.style.setProperty('--dur', durS + 's');
+    banner.classList.remove('show');
+    void banner.offsetWidth;
+    banner.classList.add('show');
+  }
+
+  function cheerPatch() {
+    patch.classList.remove('cheer');
+    void patch.offsetWidth;
+    patch.classList.add('cheer');
+  }
+
+  function ghostSwarm(n, fast) {
+    for (let i = 0; i < n; i++) {
+      setTimeout(() => spawnGhost({
+        kind: 'rise', side: i % 2 ? 'R' : 'L',
+        speed: fast ? rand(110, 170) : rand(60, 90),
+        dur: fast ? rand(7, 9) : rand(10, 13),
+        size: rand(80, 130), alpha: rand(0.65, 0.85),
+      }), i * 280);
+    }
+  }
+
+  const CELEBRATIONS = {
+    td() {
+      showBanner('TOUCHDOWN', 'FIGHT ON!', 6.5);
+      strike({ side: 'L', gold: true, strength: 1.2, batChance: 1 });
+      setTimeout(() => strike({ side: 'R', gold: true, strength: 1.2, batChance: 1 }), 450);
+      setTimeout(() => strike({ side: 'L', strength: 1 , bats: false }), 1600);
+      eyesParty = nowS() + 7;
+      ghostSwarm(10, true);
+      burstEmbers(140);
+      setTimeout(() => burstEmbers(90), 1800);
+      cheerPatch();
+    },
+    fg() {
+      showBanner('FIELD GOAL', 'FIGHT ON!', 5);
+      strike({ gold: true, strength: 1.1, batChance: 1 });
+      eyesParty = nowS() + 5;
+      ghostSwarm(4, true);
+      burstEmbers(80);
+      cheerPatch();
+    },
+    safety() {
+      showBanner('SAFETY!', 'FIGHT ON!', 5);
+      strike({ gold: true, strength: 1.1 });
+      eyesParty = nowS() + 4;
+      burstEmbers(70);
+      cheerPatch();
+    },
+    win() {
+      showBanner('TROJANS WIN!', 'FIGHT ON!', 9);
+      eyesParty = nowS() + 12;
+      cheerPatch();
+      ghostSwarm(14, false);
+      for (let i = 0; i < 4; i++) setTimeout(() => strike({ side: i % 2 ? 'R' : 'L', gold: true, strength: 1.2, batChance: 1 }), i * 1500);
+      burstEmbers(160);
+      setTimeout(() => burstEmbers(160), 3000);
+      setTimeout(() => burstEmbers(120), 6000);
+    },
+    boo() {
+      showBanner('BOO!', '', 3.5, true);
+      fogBoost = 1.2;
+      spawnGhost({ kind: 'peek', alpha: 0.85 });
+    },
+  };
+
+  // Play celebrations one at a time so they never pile up.
+  const queue = [];
+  let playingUntil = 0;
+  function enqueue(kind, atMs) { queue.push({ kind, at: atMs }); queue.sort((a, b) => a.at - b.at); }
+  setInterval(() => {
+    const now = Date.now();
+    fogBoost = Math.max(0, fogBoost - 0.05);
+    if (!queue.length || queue[0].at > now || now < playingUntil) return;
+    const { kind } = queue.shift();
+    CELEBRATIONS[kind]();
+    playingUntil = now + ({ td: 8000, fg: 6000, safety: 6000, win: 12000, boo: 4500 }[kind] || 6000);
+  }, 250);
+
+  /* ================================================================== *
+   * LIVE SCORES (ESPN public scoreboard feed)
+   * ================================================================== */
+  const scoreState = { status: CONFIG.scores ? 'starting…' : 'off', eventId: CONFIG.event, last: null, sawLive: false, finalDone: false, lastUsTD: -1e12, line: '' };
+  const API = 'https://site.api.espn.com/apis/site/v2/sports/football/college-football';
+
+  async function getJSON(url) {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  function handleScores(us, them, state) {
+    const S = scoreState;
+    const now = Date.now();
+    const at = now + CONFIG.delay * 1000;
+    if (state === 'in') S.sawLive = true;
+
+    if (!S.last) { S.last = { us, them }; return; }      // first look = baseline, never celebrate on load
+
+    const dUs = us - S.last.us, dThem = them - S.last.them;
+    if (dUs > 0) {
+      if (dUs >= 6) { enqueue('td', at); S.lastUsTD = now; }
+      else if (dUs >= 3) enqueue('fg', at);
+      else if (dUs === 2 && now - S.lastUsTD > 120000) enqueue('safety', at);
+      // +1 / +2 right after a touchdown = extra point / two-point try: already celebrated.
+    }
+    if (dThem >= 3) enqueue('boo', at);
+    S.last = { us, them };
+
+    if (state === 'post' && S.sawLive && !S.finalDone) {
+      S.finalDone = true;
+      if (us > them) enqueue('win', at + 9000);
+    }
+  }
+
+  async function pollScores() {
+    const S = scoreState;
+    let nextMs = 10000;
+    try {
+      if (!S.eventId) {
+        const d = await getJSON(`${API}/teams/${encodeURIComponent(CONFIG.team)}`);
+        const ev = d.team && d.team.nextEvent && d.team.nextEvent[0];
+        if (!ev) { S.status = 'no upcoming game found'; nextMs = 15 * 60000; return; }
+        S.eventId = ev.id;
+      }
+      const d = await getJSON(`${API}/scoreboard/${encodeURIComponent(S.eventId)}`);
+      const comp = d.competitions && d.competitions[0];
+      const st = (comp && comp.status) || d.status;
+      const state = st && st.type ? st.type.state : 'pre';
+      const mine = comp.competitors.find(c => String(c.team.id) === String(CONFIG.team));
+      const other = comp.competitors.find(c => c !== mine);
+      if (!mine || !other) throw new Error('team not in this game');
+      const us = parseInt(mine.score, 10) || 0, them = parseInt(other.score, 10) || 0;
+      S.line = `${d.shortName || d.name}: ${mine.team.abbreviation} ${us} – ${other.team.abbreviation} ${them} (${st.type.shortDetail || state})`;
+      S.status = 'ok';
+      handleScores(us, them, state);
+      if (state === 'pre') nextMs = 60000;
+      else if (state === 'post') nextMs = S.finalDone ? 10 * 60000 : 10000;
+    } catch (err) {
+      S.status = 'waiting for connection (' + err.message + ')';
+      nextMs = 20000;
+    } finally {
+      updateDebug();
+      setTimeout(pollScores, nextMs);
+    }
+  }
+
+  /* ================================================================== *
+   * Debug / preview
+   * ================================================================== */
+  let debugEl = null;
+  function updateDebug() {
+    if (!debugEl) return;
+    const S = scoreState;
+    debugEl.textContent =
+      'PREVIEW MODE — remove ?debug=1 for OBS\n' +
+      'T touchdown · F field goal · S safety · O opponent scores · W win · L lightning · G ghost\n' +
+      `Scores: ${S.status}${S.line ? '\n' + S.line : ''}\nCelebration delay: ${CONFIG.delay}s`;
+  }
   if (CONFIG.debug) {
     document.body.classList.add('debug');
-    const zones = CONFIG.clearZones.concat([
-      { label: 'Top broadcast graphics (bats stay below)', x: 0, y: 0, w: W, h: CONFIG.topClearHeight },
-    ]);
-    for (const z of zones) {
+    for (const z of CONFIG.clearZones) {
       const d = document.createElement('div');
       d.className = 'zone';
       Object.assign(d.style, { left: z.x + 'px', top: z.y + 'px', width: z.w + 'px', height: z.h + 'px' });
       d.textContent = z.label;
-      stage.insertBefore(d, canvas);
+      stage.insertBefore(d, stage.firstChild);
     }
-    const help = document.createElement('div');
-    help.className = 'debug-help';
-    help.innerHTML = 'PREVIEW MODE &mdash; remove <b>?debug=1</b> for OBS<br>Press <b>L</b> for lightning, <b>B</b> for bats';
-    stage.insertBefore(help, canvas);
+    debugEl = document.createElement('div');
+    debugEl.id = 'debugStatus';
+    stage.appendChild(debugEl);
+    updateDebug();
   }
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
-    if (k === 'l') strike();
-    if (k === 'b') spawnSwoop();
+    const map = { t: 'td', f: 'fg', s: 'safety', o: 'boo', w: 'win' };
+    if (map[k]) { enqueue(map[k], Date.now()); return; }
+    if (k === 'l') strike({ batChance: 1 });
+    if (k === 'g') spawnGhost();
   });
 
-  /* ------------------------------------------------------------------ *
+  /* ================================================================== *
    * Main loop
-   * ------------------------------------------------------------------ */
+   * ================================================================== */
   const minFrameMs = CONFIG.fps > 0 ? 1000 / CONFIG.fps : 0;
-  let last = performance.now();
-  let lastDraw = 0;
+  let last = performance.now(), lastDraw = 0;
 
   function frame(now) {
     requestAnimationFrame(frame);
     if (minFrameMs && now - lastDraw < minFrameMs - 1) return;
     lastDraw = now;
-
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     const t = now / 1000;
 
     ctx.clearRect(0, 0, W, H);
-    if (CONFIG.fog)  drawFog(t, dt, lightningGlow(now));
-    if (CONFIG.bats) updateBats(t, dt);
+    if (CONFIG.fog) drawFog(t, dt, lightningGlow(now));
+    if (CONFIG.eyes) updateEyes(t);
+    updateGhosts(t);
+    drawBolts(t);
+    updateBats(t, dt);
+    updateEmbers(t, dt);
   }
 
   if (CONFIG.lightning) scheduleLightning();
+  if (CONFIG.scores) pollScores();
   requestAnimationFrame(frame);
 })();
 </script>
